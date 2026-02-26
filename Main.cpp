@@ -12,35 +12,42 @@ struct employee
     double hours;
 };
 
-string findExeFile(string filename)
+wstring stringToWstring(const string& str)
 {
-    vector<string> searchPaths = 
+    int size_needed = MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), NULL, 0);
+    wstring wstr(size_needed, 0);
+    MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), &wstr[0], size_needed);
+    return wstr;
+}
+
+wstring findExeFile(const string& filename)
+{
+    vector<string> searchPaths =
     {
-         
-        "C:\\Users\\Fafka\\Desktop\\oc\\lab1\\Main\\x64\\Debug\\",        
+        "C:\\Users\\Fafka\\Desktop\\oc\\lab1\\Main\\x64\\Debug\\",
     };
 
-    for (string path : searchPaths)
+    for (const string& path : searchPaths)
     {
         string fullPath = path + filename;
         ifstream test(fullPath.c_str());
         if (test.good())
         {
             test.close();
-            cout << "Найден в" << fullPath << endl;
-            return fullPath;
+            cout << "Найден в " << fullPath << endl;
+            return stringToWstring(fullPath);
         }
     }
 
-    return "";
+    return L"";
 }
 
-void showBinaryFile(string filename)
+void showBinaryFile(const string& filename)
 {
     ifstream file(filename, ios::binary);
     if (!file)
     {
-        cout << "Не удалось открыть файл" << filename << endl;
+        cout << "Не удалось открыть файл " << filename << endl;
         return;
     }
 
@@ -55,7 +62,7 @@ void showBinaryFile(string filename)
     file.close();
 }
 
-void showReport(string filename)
+void showReport(const string& filename)
 {
     ifstream file(filename);
     if (!file)
@@ -78,7 +85,7 @@ int main()
     system("chcp 1251 > NULL");
 
     cout << "Поиск Creater.exe" << endl;
-    string creatorPath = findExeFile("Creater.exe");
+    wstring creatorPath = findExeFile("Creater.exe");
     if (creatorPath.empty())
     {
         cout << "Creater.exe не найден" << endl;
@@ -86,7 +93,7 @@ int main()
     }
 
     cout << "Поиск Reporter.exe" << endl;
-    string reporterPath = findExeFile("Reporter.exe");
+    wstring reporterPath = findExeFile("Reporter.exe");
     if (reporterPath.empty())
     {
         cout << "Reporter.exe не найден" << endl;
@@ -101,20 +108,55 @@ int main()
     cout << "Введите количество записей: ";
     cin >> recordCount;
 
-    string cmd = "\"" + creatorPath + "\" " + binFileName + " " + to_string(recordCount);
-    cout << "Запуск Creator... (команда: " << cmd << ")" << endl;
+    STARTUPINFOW siCreator;
+    PROCESS_INFORMATION piCreator;
 
-    int result = system(cmd.c_str());
-    if (result != 0)
+    ZeroMemory(&siCreator, sizeof(siCreator));
+    siCreator.cb = sizeof(siCreator);
+    ZeroMemory(&piCreator, sizeof(piCreator));
+
+    wstring creatorCmdLine = L"\"" + creatorPath + L"\" " +
+        stringToWstring(binFileName) + L" " +
+        to_wstring(recordCount);
+
+    wchar_t* creatorCmdLineMutable = new wchar_t[creatorCmdLine.length() + 1];
+    wcscpy_s(creatorCmdLineMutable, creatorCmdLine.length() + 1, creatorCmdLine.c_str());
+
+    string creatorCmdLineA(creatorCmdLine.begin(), creatorCmdLine.end());
+    cout << "Запуск Creator (команда: " << creatorCmdLineA << ")" << endl;
+
+    if (!CreateProcessW(
+        NULL,                   
+        creatorCmdLineMutable,   
+        NULL,                    
+        NULL,                    
+        FALSE,                   
+        0,        
+        NULL,                    
+        NULL,                    
+        &siCreator,              
+        &piCreator))             
     {
-        cout << "Ошибка при запуске Creator" << result << endl;
+        cout << "Ошибка при запуске Creator. Код ошибки: " << GetLastError() << endl;
+        delete[] creatorCmdLineMutable;
         return 1;
     }
+
+    delete[] creatorCmdLineMutable;
+
+    cout << "Процесс Creator запущен. Ожидание завершения..." << endl;
+
+    WaitForSingleObject(piCreator.hProcess, INFINITE);
+
+    cout << "Процесс Creator завершен." << endl;
+
+    CloseHandle(piCreator.hProcess);
+    CloseHandle(piCreator.hThread);
 
     ifstream testFile(binFileName);
     if (!testFile)
     {
-        cout << "Файл " << binFileName << " не был создан!" << endl;
+        cout << "Файл " << binFileName << " не был создан" << endl;
         return 1;
     }
     testFile.close();
@@ -129,15 +171,51 @@ int main()
     cout << "Введите оплату за час: ";
     cin >> hourlyRate;
 
-    cmd = "\"" + reporterPath + "\" " + binFileName + " " + reportFileName + " " + to_string(hourlyRate);
-    cout << "Запуск Reporter (команда: " << cmd << ")" << endl;
+    STARTUPINFOW siReporter;
+    PROCESS_INFORMATION piReporter;
 
-    result = system(cmd.c_str());
-    if (result != 0)
+    ZeroMemory(&siReporter, sizeof(siReporter));
+    siReporter.cb = sizeof(siReporter);
+    ZeroMemory(&piReporter, sizeof(piReporter));
+
+    wstring reporterCmdLine = L"\"" + reporterPath + L"\" " +
+        stringToWstring(binFileName) + L" " +
+        stringToWstring(reportFileName) + L" " +
+        to_wstring(hourlyRate);
+
+    wchar_t* reporterCmdLineMutable = new wchar_t[reporterCmdLine.length() + 1];
+    wcscpy_s(reporterCmdLineMutable, reporterCmdLine.length() + 1, reporterCmdLine.c_str());
+
+    string reporterCmdLineA(reporterCmdLine.begin(), reporterCmdLine.end());
+    cout << "Запуск Reporter... (команда: " << reporterCmdLineA << ")" << endl;
+
+    if (!CreateProcessW(
+        NULL,                     
+        reporterCmdLineMutable,   
+        NULL,                     
+        NULL,                     
+        FALSE,                    
+        0,         
+        NULL,                     
+        NULL,                    
+        &siReporter,            
+        &piReporter))             
     {
-        cout << "Ошибка при запуске Reporter" << result << endl;
+        cout << "Ошибка при запуске Reporter. Код ошибки: " << GetLastError() << endl;
+        delete[] reporterCmdLineMutable;
         return 1;
     }
+
+    delete[] reporterCmdLineMutable;
+
+    cout << "Процесс Reporter запущен. Ожидание завершения" << endl;
+
+    WaitForSingleObject(piReporter.hProcess, INFINITE);
+
+    cout << "Процесс Reporter завершен." << endl;
+
+    CloseHandle(piReporter.hProcess);
+    CloseHandle(piReporter.hThread);
 
     showReport(reportFileName);
     return 0;
