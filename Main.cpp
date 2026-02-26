@@ -16,17 +16,15 @@ string findExeFile(string filename)
 {
     vector<string> searchPaths = 
     {
-        "",                    
-        "Debug\\",                      
-        "x64\\Debug\\",          
-        "..\\Debug\\",        
+         
+        "C:\\Users\\Fafka\\Desktop\\oc\\lab1\\Main\\x64\\Debug\\",        
     };
 
     for (string path : searchPaths)
     {
         string fullPath = path + filename;
         ifstream test(fullPath.c_str());
-        if (test)
+        if (test.good())
         {
             test.close();
             cout << "Найден в" << fullPath << endl;
@@ -79,11 +77,11 @@ int main()
 {
     system("chcp 1251 > NULL");
 
-    cout << "Поиск Creator.exe" << endl;
-    string creatorPath = findExeFile("Creator.exe");
+    cout << "Поиск Creater.exe" << endl;
+    string creatorPath = findExeFile("Creater.exe");
     if (creatorPath.empty())
     {
-        cout << "Creator.exe не найден" << endl;
+        cout << "Creater.exe не найден" << endl;
         return 1;
     }
 
